@@ -1,0 +1,240 @@
+# ==================================================
+# PROJECT: SaloneCare MediQueue — GUI VERSION
+# TOOL: Python + Tkinter | JSON Data Storage
+# PRINCIPLE: Structured Programming
+# FEATURES: Login/Register • Admin & Patient Dashboards
+# ==================================================
+
+import tkinter as tk
+from tkinter import ttk, messagebox
+import json
+
+# ---------- DATA FILES ----------
+QUEUE_FILE   = "salonecare_queue.json"
+RECORD_FILE  = "salonecare_records.json"
+USER_FILE    = "salonecare_users.json"
+
+# ---------- GLOBAL DATA ----------
+queue_list   = []
+record_list  = []
+user_list    = []
+queue_number = 1
+current_user = None
+
+
+# ========== FILE HANDLING ==========
+def load_all_data():
+    global queue_list, record_list, user_list, queue_number
+    try:
+        with open(QUEUE_FILE,"r") as f: queue_list = json.load(f)
+        with open(RECORD_FILE,"r") as f: record_list = json.load(f)
+        with open(USER_FILE,"r") as f: user_list = json.load(f)
+        nums = [p["q_no"] for p in queue_list + record_list]
+        queue_number = max(nums) + 1 if nums else 1
+    except:
+        queue_list = []
+        record_list = []
+        user_list = [{"uname":"admin","pwd":"admin123","role":"ADMIN"}]
+        queue_number = 1
+
+def save_all_data():
+    with open(QUEUE_FILE,"w") as f: json.dump(queue_list,f,indent=2)
+    with open(RECORD_FILE,"w") as f: json.dump(record_list,f,indent=2)
+    with open(USER_FILE,"w") as f: json.dump(user_list,f,indent=2)
+
+
+# ========== MAIN APPLICATION CLASS ==========
+class SaloneCareApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("🩺 SaloneCare MediQueue — Sierra Leone")
+        self.root.geometry("900x600")
+        self.root.resizable(True,True)
+        load_all_data()
+        self.show_login_screen()
+
+    # --- CLEAR WINDOW ---
+    def clear_window(self):
+        for w in self.root.winfo_children():
+            w.destroy()
+
+    # --- LOGIN SCREEN ---
+    def show_login_screen(self):
+        self.clear_window()
+        tk.Label(self.root, text="🩺 SALONECARE MEDIQUEUE", font=("Arial",20,"bold"),fg="#006633").pack(pady=20)
+        tk.Label(self.root, text="Secure Login", font=("Arial,14")).pack(pady=5)
+
+        f = ttk.Frame(self.root); f.pack(pady=10)
+        ttk.Label(f,text="Username:").grid(row=0,col=0,padx=5,pady=8,sticky="e")
+        self.uname = ttk.Entry(f,width=30); self.uname.grid(row=0,col=1,padx=5,pady=8)
+        ttk.Label(f,text="Password:").grid(row=1,col=0,padx=5,pady=8,sticky="e")
+        self.pwd = ttk.Entry(f,width=30,show="*"); self.pwd.grid(row=1,col=1,padx=5,pady=8)
+
+        ttk.Button(self.root,text="🔐 Login",command=self.do_login).pack(pady=5)
+        ttk.Button(self.root,text="📝 New Account",command=self.show_register_screen).pack(pady=5)
+        ttk.Button(self.root,text="❌ Exit",command=self.root.quit).pack(pady=5)
+
+    def do_login(self):
+        global current_user
+        u,p = self.uname.get().strip(), self.pwd.get().strip()
+        for user in user_list:
+            if user["uname"]==u and user["pwd"]==p:
+                current_user = user
+                messagebox.showinfo("Success",f"Welcome {u} — Role: {user['role']}")
+                if user["role"]=="ADMIN": self.show_admin_dash()
+                else: self.show_patient_dash()
+                return
+        messagebox.showerror("Error","Invalid Username or Password")
+
+    # --- REGISTER SCREEN ---
+    def show_register_screen(self):
+        self.clear_window()
+        tk.Label(self.root,text="📝 Register New User",font=("Arial",16,"bold")).pack(pady=15)
+        f=ttk.Frame(self.root); f.pack(pady=10)
+
+        ttk.Label(f,text="Username:").grid(row=0,col=0,padx=5,pady=7,sticky="e")
+        ru=ttk.Entry(f,width=30); ru.grid(row=0,col=1,padx=5,pady=7)
+        ttk.Label(f,text="Password:").grid(row=1,col=0,padx=5,pady=7,sticky="e")
+        rp=ttk.Entry(f,width=30,show="*"); rp.grid(row=1,col=1,padx=5,pady=7)
+        ttk.Label(f,text="Role:").grid(row=2,col=0,padx=5,pady=7,sticky="e")
+        rr=ttk.Combobox(f,values=["ADMIN","PATIENT"],state="readonly"); rr.grid(row=2,col=1,padx=5,pady=7)
+
+        def save_user():
+            u=ru.get().strip(); p=rp.get().strip(); r=rr.get().strip().upper()
+            if not all([u,p,r]): messagebox.showwarning("Fill all fields"); return
+            if any(x["uname"]==u for x in user_list): messagebox.showerror("Exists","Username taken"); return
+            if r not in ["ADMIN","PATIENT"]: messagebox.showerror("Role","Only ADMIN/PATIENT"); return
+            user_list.append({"uname":u,"pwd":p,"role":r})
+            save_all_data()
+            messagebox.showinfo("Done","✅ Account Created")
+            self.show_login_screen()
+
+        ttk.Button(self.root,text="✅ Save",command=save_user).pack(pady=5)
+        ttk.Button(self.root,text="🔙 Back",command=self.show_login_screen).pack(pady=5)
+
+    # --- ADMIN DASHBOARD ---
+    def show_admin_dash(self):
+        self.clear_window()
+        tk.Label(self.root,text="🛡️ ADMIN DASHBOARD — SALONECARE",font=("Arial",18,"bold"),fg="#004488").pack(pady=10)
+        nb = ttk.Notebook(self.root); nb.pack(fill="both",expand=1,padx=10,pady=5)
+
+        # --- TAB 1: REGISTRATION ---
+        f1 = ttk.Frame(nb); nb.add(f1,text="📋 Register Patient")
+        ttk.Label(f1,text="Full Name:").grid(r=0,c=0,padx=8,pady=6,sticky="e")
+        n=ttk.Entry(f1,40); n.grid(r=0,c=1)
+        ttk.Label(f1,text="Age:").grid(r=1,c=0,padx=8,pady=6,sticky="e")
+        a=ttk.Entry(f1,15); a.grid(r=1,c=1,sticky="w")
+        ttk.Label(f1,text="Sex:").grid(r=2,c=0,padx=8,pady=6,sticky="e")
+        s=ttk.Combobox(f1,values=["M","F","O"],state="readonly"); s.grid(r=2,c=1,sticky="w")
+        ttk.Label(f1,text="Residence:").grid(r=3,c=0,padx=8,pady=6,sticky="e")
+        ar=ttk.Entry(f1,40); ar.grid(r=3,c=1)
+        ttk.Label(f1,text="Phone:").grid(r=4,c=0,padx=8,pady=6,sticky="e")
+        ph=ttk.Entry(f1,25); ph.grid(r=4,c=1,sticky="w")
+        prio=tk.BooleanVar(); ttk.Checkbutton(f1,text="🚑 Priority (Emergency/<5yrs/Pregnant)",variable=prio).grid(r=5,c=1,sticky="w",pady=5)
+
+        def reg_patient():
+            global queue_number
+            pat={"q_no":queue_number,"name":n.get().strip(),"age":a.get().strip(),"sex":s.get(),
+                 "area":ar.get().strip(),"phone":ph.get().strip(),"priority":prio.get(),"status":"WAITING","note":""}
+            if prio.get(): queue_list.insert(0,pat)
+            else: queue_list.append(pat)
+            queue_number+=1; save_all_data()
+            messagebox.showinfo("Registered",f"✅ Queue No: {pat['q_no']}")
+            n.delete(0,"end");a.delete(0,"end");ar.delete(0,"end");ph.delete(0,"end");s.set("");prio.set(False)
+
+        ttk.Button(f1,text="📌 Register",command=reg_patient).grid(r=6,c=1,sticky="w",pady=8)
+
+        # --- TAB 2: QUEUE VIEW ---
+        f2=ttk.Frame(nb); nb.add(f2,text="📋 Current Queue")
+        cols=("QNo","Name","Age","Priority","Status")
+        qt=ttk.Treeview(f2,columns=cols,show="headings")
+        for c in cols: qt.heading(c,text=c); qt.column(c,width=120)
+        qt.pack(fill="both",expand=1)
+
+        def load_q():
+            for i in qt.get_children(): qt.delete(i)
+            for p in queue_list: qt.insert("",tk.END,values=(p["q_no"],p["name"],p["age"],"YES"if p["priority"]else"NO",p["status"]))
+        load_q()
+        ttk.Button(f2,text="🔄 Refresh",command=load_q).pack(pady=3)
+
+        # --- TAB 3: CALL NEXT ---
+        f3=ttk.Frame(nb); nb.add(f3,text="🩺 Consultation")
+        def call_next():
+            if not queue_list: messagebox.showinfo("Queue Empty"); return
+            p=queue_list.pop(0); p["status"]="SERVED"
+            win=tk.Toplevel(self.root); win.title("Consult Form")
+            tk.Label(win,text=f"Q{p['q_no']} — {p['name']}",font=("Arial",14,"bold")).pack(pady=5)
+            tk.Label(win,text=f"Age: {p['age']} | Priority: {'YES'if p['priority']else'NO'}").pack()
+            tk.Label(win,text="Diagnosis / Treatment:").pack()
+            note=tk.Text(win,width=45,height=5); note.pack(pady=4)
+            def save_note():
+                p["note"]=note.get("1.0",tk.END).strip()
+                record_list.append(p); save_all_data(); win.destroy(); load_q(); messagebox.showinfo("Saved ✅")
+            ttk.Button(win,text="💾 Save",command=save_note).pack(pady=4)
+        ttk.Button(f3,text="▶️ CALL NEXT PATIENT",command=call_next).pack(pady=15)
+
+        # --- TAB 4: REPORT ---
+        f4=ttk.Frame(nb); nb.add(f4,text="📊 Report")
+        def show_rpt():
+            total=queue_number-1; wait=len(queue_list); served=len(record_list); prio_served=sum(1 for x in record_list if x["priority"])
+            txt=f"""📈 SALONECARE DAILY SUMMARY
+• Total Registered : {total}
+• Waiting Now      : {wait}
+• Served           : {served}
+• Priority Cases   : {prio_served}"""
+            messagebox.showinfo("Report",txt)
+        ttk.Button(f4,text="📑 Generate Report",command=show_rpt).pack(pady=20)
+
+        ttk.Button(self.root,text="🔓 Logout",command=self.show_login_screen).pack(pady=5)
+
+    # --- PATIENT DASHBOARD ---
+    def show_patient_dash(self):
+        self.clear_window()
+        tk.Label(self.root,text="🧑‍⚕️ PATIENT PORTAL — SALONECARE",font=("Arial",18,"bold"),fg="#007722").pack(pady=10)
+        nb=ttk.Notebook(self.root); nb.pack(fill="both",expand=1,padx=10,pady=5)
+
+        # VIEW QUEUE
+        f1=ttk.Frame(nb); nb.add(f1,text="📋 View Queue")
+        cols=("QNo","Name","Age","Priority","Status")
+        qt=ttk.Treeview(f1,columns=cols,show="headings")
+        for c in cols: qt.heading(c,text=c); qt.column(c,width=130)
+        qt.pack(fill="both",expand=1)
+        def lq():
+            for i in qt.get_children(): qt.delete(i)
+            for p in queue_list: qt.insert("",tk.END,values=(p["q_no"],p["name"],p["age"],"YES"if p["priority"]else"NO",p["status"]))
+        lq(); ttk.Button(f1,text="🔄 Refresh",command=lq).pack(pady=3)
+
+        # CHECK POSITION
+        f2=ttk.Frame(nb); nb.add(f2,text="📍 My Position")
+        ttk.Label(f2,text="Enter Queue No:").pack(pady=8)
+        qn=ttk.Entry(f2,width=20); qn.pack(pady=2)
+        def chk():
+            try: q=int(qn.get().strip())
+            except: messagebox.showwarning("Number only"); return
+            pos=next((i+1 for i,p in enumerate(queue_list) if p["q_no"]==q),None)
+            if pos: messagebox.showinfo("Position",f"You are NUMBER {pos} in waiting list")
+            else: messagebox.showinfo("Status","✅ Already Served / Not Found")
+        ttk.Button(f2,text="🔍 Check",command=chk).pack(pady=6)
+
+        # SEARCH RECORD
+        f3=ttk.Frame(nb); nb.add(f3,text="🔎 Search Record")
+        ttk.Label(f3,text="Queue No / Name:").pack(pady=5)
+        key=ttk.Entry(f3,width=35); key.pack()
+        def sch():
+            kw=key.get().strip().lower(); found=[]
+            for lst in (queue_list,record_list):
+                for p in lst:
+                    if kw in str(p["q_no"]) or kw in p["name"].lower(): found.append(p)
+            if not found: messagebox.showinfo("Result","❌ Not Found"); return
+            out="\n".join(f"Q{f['q_no']} | {f['name']} | {f['status']} | {f['note']}" for f in found)
+            messagebox.showinfo("Found",out)
+        ttk.Button(f3,text="🔍 Search",command=sch).pack(pady=6)
+
+        ttk.Button(self.root,text="🔓 Logout",command=self.show_login_screen).pack(pady=5)
+
+
+# ========== RUN APP ==========
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = SaloneCareApp(root)
+    root.mainloop()
